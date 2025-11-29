@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>גמ"ח וויז - משפ' צדקה</title>
+    
+    <!-- Tailwind CSS for rich UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Rubik', sans-serif;
+            background-color: #f0f9ff; /* Light blue background */
+        }
+        
+        /* Waze-like Blue Gradient */
+        .waze-header {
+            background: linear-gradient(135deg, #33ccff 0%, #0099ff 100%);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .card {
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555; 
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        /* Input styling */
+        .input-field {
+            width: 100%;
+            padding: 0.5rem 1rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 0.75rem;
+            transition: border-color 0.2s;
+        }
+        .input-field:focus {
+            outline: none;
+            border-color: #33ccff;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="waze-header text-white p-4 sticky top-0 z-50">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <!-- Logo Placeholer -->
+                <div class="bg-white text-blue-500 rounded-full w-12 h-12 flex items-center justify-center font-bold text-2xl shadow-lg border-2 border-slate-100">
+                    <i class="fa-brands fa-waze"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-black tracking-tight">גמ"ח וויז - משפ' צדקה</h1>
+                    <p class="text-sm opacity-90 font-medium">"וויז כשר לדרך שלך"</p>
+                </div>
+            </div>
+            
+            <!-- Navigation -->
+            <nav class="hidden md:flex gap-2 bg-white/20 p-1 rounded-full backdrop-blur-sm">
+                <button onclick="showView('dashboard')" class="nav-btn px-4 py-2 rounded-full hover:bg-white/30 transition font-bold" id="nav-dashboard">לוח ראשי</button>
+                <button onclick="showView('inventory')" class="nav-btn px-4 py-2 rounded-full hover:bg-white/30 transition font-bold" id="nav-inventory">ניהול מלאי</button>
+                <button onclick="showView('clients')" class="nav-btn px-4 py-2 rounded-full hover:bg-white/30 transition font-bold" id="nav-clients">לקוחות</button>
+                <button onclick="showView('settings')" class="nav-btn px-4 py-2 rounded-full hover:bg-white/30 transition font-bold" id="nav-settings">הגדרות</button>
+            </nav>
+
+            <!-- Mobile Menu Button -->
+            <button class="md:hidden text-2xl"><i class="fa-solid fa-bars"></i></button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto p-4 flex-grow relative">
+
+        <!-- VIEW: DASHBOARD -->
+        <div id="view-dashboard" class="view-section space-y-6">
+            
+            <!-- Google Style Search -->
+            <div class="relative max-w-2xl mx-auto mt-4">
+                <div class="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                    <i class="fa-solid fa-magnifying-glass text-gray-400 text-xl"></i>
+                </div>
+                <input type="text" id="mainSearch" oninput="handleGlobalSearch(this.value)" 
+                    class="block w-full p-4 pr-12 text-lg text-gray-900 border-none rounded-full shadow-lg focus:ring-4 focus:ring-blue-300 bg-white placeholder-gray-400" 
+                    placeholder="חיפוש מהיר: שם לקוח, טלפון, או מספר מכשיר...">
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                <div class="card bg-white p-6 rounded-2xl shadow-sm border-r-4 border-blue-500">
+                    <div class="text-gray-500 text-sm font-bold">סך הכל מכשירים</div>
+                    <div class="text-3xl font-black text-blue-600" id="stat-total">0</div>
+                </div>
+                <div class="card bg-white p-6 rounded-2xl shadow-sm border-r-4 border-green-500">
+                    <div class="text-gray-500 text-sm font-bold">זמינים להשכרה</div>
+                    <div class="text-3xl font-black text-green-600" id="stat-available">0</div>
+                </div>
+                <div class="card bg-white p-6 rounded-2xl shadow-sm border-r-4 border-orange-500">
+                    <div class="text-gray-500 text-sm font-bold">מושכרים כרגע</div>
+                    <div class="text-3xl font-black text-orange-600" id="stat-rented">0</div>
+                </div>
+                <div class="card bg-white p-6 rounded-2xl shadow-sm border-r-4 border-red-500">
+                    <div class="text-gray-500 text-sm font-bold">באיחור / חוב</div>
+                    <div class="text-3xl font-black text-red-600" id="stat-overdue">0</div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="flex justify-center mt-4">
+                <button onclick="openRentalModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-xl font-bold py-4 px-12 rounded-full shadow-lg transform transition hover:scale-105 flex items-center gap-3">
+                    <i class="fa-solid fa-plus-circle"></i> השכרה חדשה
+                </button>
+            </div>
+
+            <!-- Active Rentals Table -->
+            <div class="bg-white rounded-2xl shadow-sm overflow-hidden mt-6">
+                <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                    <h2 class="font-bold text-lg text-gray-700"><i class="fa-solid fa-car-side text-blue-500 ml-2"></i>השכרות פעילות</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-right">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3">מכשיר</th>
+                                <th class="px-6 py-3">לקוח</th>
+                                <th class="px-6 py-3">יציאה</th>
+                                <th class="px-6 py-3">צפי החזרה</th>
+                                <th class="px-6 py-3">אביזרים</th>
+                                <th class="px-6 py-3">פעולות</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activeRentalsTableBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: INVENTORY -->
+        <div id="view-inventory" class="view-section hidden space-y-6">
+            <div class="flex justify-between items-center">
+                <h2 class="text-2xl font-bold">ניהול מלאי ומכשירים</h2>
+                <button onclick="openDeviceModal()" class="bg-green-500 text-white px-4 py-2 rounded-lg font-bold shadow hover:bg-green-600">
+                    <i class="fa-solid fa-mobile-screen-button ml-2"></i>הוסף מכשיר
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="inventoryGrid">
+                <!-- Device Cards populated by JS -->
+            </div>
+        </div>
+
+        <!-- VIEW: CLIENTS -->
+        <div id="view-clients" class="view-section hidden space-y-6">
+            <div class="flex justify-between items-center">
+                <h2 class="text-2xl font-bold">לקוחות</h2>
+                <input type="text" placeholder="חיפוש לקוח..." class="input-field max-w-xs" oninput="filterClients(this.value)">
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+                <table class="w-full text-sm text-right">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3">שם</th>
+                            <th class="px-6 py-3">טלפון</th>
+                            <th class="px-6 py-3">סטטוס</th>
+                            <th class="px-6 py-3">הערות/חובות</th>
+                            <th class="px-6 py-3">פעולות</th>
+                        </tr>
+                    </thead>
+                    <tbody id="clientsTableBody">
+                        <!-- JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- VIEW: SETTINGS -->
+        <div id="view-settings" class="view-section hidden space-y-6">
+            <h2 class="text-2xl font-bold">הגדרות מערכת</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Pricing -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm">
+                    <h3 class="font-bold text-lg mb-4 border-b pb-2">מחירון והגדרות השכרה</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">מחיר רגיל ליום (₪)</label>
+                            <input type="number" id="setting-price-day" class="input-field" value="20">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">מחיר בין הזמנים / חג (₪)</label>
+                            <input type="number" id="setting-price-high" class="input-field" value="30">
+                        </div>
+                        <div class="flex items-center gap-2 mt-4">
+                            <input type="checkbox" id="setting-is-high-season" class="w-5 h-5 text-blue-600">
+                            <label for="setting-is-high-season" class="font-bold">הפעל תעריף בין הזמנים כעת</label>
+                        </div>
+                    </div>
+                    <button onclick="saveSettings()" class="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg font-bold">שמור שינויים</button>
+                </div>
+
+                <!-- Data Management -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm">
+                    <h3 class="font-bold text-lg mb-4 border-b pb-2">ניהול נתונים</h3>
+                    <p class="text-sm text-gray-600 mb-4">הנתונים נשמרים בדפדפן. מומלץ לגבות מדי פעם.</p>
+                    <div class="flex gap-4">
+                        <button onclick="exportData()" class="flex-1 bg-gray-800 text-white py-2 rounded-lg"><i class="fa-solid fa-download ml-2"></i>שמור נתונים לקובץ</button>
+                        <button onclick="document.getElementById('importFile').click()" class="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg"><i class="fa-solid fa-upload ml-2"></i>טען נתונים</button>
+                        <input type="file" id="importFile" class="hidden" onchange="importData(this)">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAL: NEW RENTAL -->
+    <div id="modal-rental" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div class="bg-gradient-to-r from-blue-500 to-cyan-400 p-6 text-white flex justify-between items-center">
+                <h2 class="text-2xl font-black">השכרה חדשה</h2>
+                <button onclick="closeModal('modal-rental')" class="text-white hover:text-gray-200"><i class="fa-solid fa-xmark text-2xl"></i></button>
+            </div>
+            
+            <div class="p-6 space-y-6">
+                <!-- Client Section -->
+                <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                    <h3 class="font-bold text-blue-800 mb-3"><i class="fa-solid fa-user ml-2"></i>פרטי לקוח</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 mb-1">שם הלקוח</label>
+                            <input type="text" id="rental-client-name" list="clients-datalist" class="input-field" placeholder="התחל להקליד..." onchange="autofillClient(this.value)">
+                            <datalist id="clients-datalist"></datalist>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 mb-1">טלפון</label>
+                            <input type="tel" id="rental-client-phone" class="input-field">
+                        </div>
+                    </div>
+                    <div id="client-warnings" class="text-red-600 text-sm font-bold mt-2 hidden">⚠️ התראה: ללקוח זה יש הערות מערכת!</div>
+                </div>
+
+                <!-- Device Section -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-bold mb-1">בחר מכשיר (פנויים בלבד)</label>
+                        <select id="rental-device-select" class="input-field bg-white">
+                            <!-- JS populated -->
+                        </select>
+                    </div>
+                    
+                    <!-- Dates -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">תאריך יציאה</label>
+                            <input type="date" id="rental-start-date" class="input-field text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">צפי החזרה</label>
+                            <input type="date" id="rental-end-date" class="input-field text-sm" onchange="calculateEstimate()">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Checklist & Addons -->
+                <div class="bg-gray-50 p-4 rounded-xl">
+                    <h3 class="font-bold text-gray-700 mb-2 text-sm">ציוד נלווה ושירותים</h3>
+                    <div class="flex flex-wrap gap-4">
+                        <label class="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border shadow-sm cursor-pointer">
+                            <input type="checkbox" id="check-charger" checked class="w-4 h-4"> מטען
+                        </label>
+                        <label class="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border shadow-sm cursor-pointer">
+                            <input type="checkbox" id="check-cable" checked class="w-4 h-4"> כבל
+                        </label>
+                        <label class="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border shadow-sm cursor-pointer">
+                            <input type="checkbox" id="check-mount" class="w-4 h-4"> תושבת
+                        </label>
+                        <div class="w-full h-px bg-gray-200 my-1"></div>
+                        <label class="flex items-center gap-2 bg-yellow-50 px-3 py-2 rounded-lg border border-yellow-200 cursor-pointer text-yellow-800">
+                            <input type="checkbox" id="check-insurance" class="w-4 h-4" onchange="calculateEstimate()"> 🛡️ ביטוח שבר (+5₪)
+                        </label>
+                        <label class="flex items-center gap-2 bg-purple-50 px-3 py-2 rounded-lg border border-purple-200 cursor-pointer text-purple-800">
+                            <input type="checkbox" id="check-deposit" class="w-4 h-4"> 💳 הושאר פיקדון
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Summary -->
+                <div class="flex justify-between items-end border-t pt-4">
+                    <div>
+                        <div class="text-sm text-gray-500">סה"כ משוער לתשלום:</div>
+                        <div class="text-3xl font-black text-blue-600">₪<span id="rental-estimate">0</span></div>
+                    </div>
+                    <button onclick="submitRental()" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg">בצע השכרה</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: RETURN DEVICE -->
+    <div id="modal-return" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg">
+            <div class="bg-gray-800 p-6 text-white flex justify-between items-center rounded-t-3xl">
+                <h2 class="text-xl font-bold">החזרת מכשיר</h2>
+                <button onclick="closeModal('modal-return')" class="text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <input type="hidden" id="return-rental-id">
+                
+                <div class="bg-gray-100 p-4 rounded-lg text-center">
+                    <div id="return-device-name" class="font-bold text-lg"></div>
+                    <div id="return-client-name" class="text-gray-600"></div>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block font-bold">תאריך החזרה בפועל:</label>
+                    <input type="date" id="return-actual-date" class="input-field" onchange="calculateFinalPrice()">
+                    
+                    <div class="flex items-center gap-2 mt-2">
+                         <input type="checkbox" id="return-shabbat" class="w-5 h-5" onchange="calculateFinalPrice()">
+                         <label for="return-shabbat">קיזוז שבת/חג (יום אחד חינם)</label>
+                    </div>
+                </div>
+
+                <div class="bg-yellow-50 p-3 rounded border border-yellow-200">
+                    <h4 class="font-bold text-sm mb-2">משוב ובקרת איכות</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <select id="return-quality" class="input-field text-sm">
+                            <option value="good">תקין לגמרי</option>
+                            <option value="battery">בעיית סוללה</option>
+                            <option value="gps">בעיית GPS</option>
+                            <option value="broken">שבר/נזק</option>
+                        </select>
+                        <select id="return-accessories" class="input-field text-sm">
+                            <option value="all">הכל הוחזר</option>
+                            <option value="missing">חסר ציוד</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="border-t pt-4 flex justify-between items-center">
+                    <div class="text-right">
+                        <div class="text-xs text-gray-500">לתשלום סופי:</div>
+                        <div class="text-3xl font-black text-green-600">₪<span id="return-final-price">0</span></div>
+                    </div>
+                    <div class="space-x-2 space-x-reverse">
+                         <button onclick="processReturn(false)" class="bg-orange-100 text-orange-800 px-4 py-2 rounded-lg font-bold border border-orange-200">תרשום חוב</button>
+                         <button onclick="processReturn(true)" class="bg-green-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg">שולם והוחזר</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // --- Data Structure & State ---
+        let db = {
+            settings: {
+                pricePerDay: 20,
+                priceHighSeason: 30,
+                isHighSeason: false,
+                insuranceCost: 5
+            },
+            devices: [],
+            clients: [],
+            rentals: []
+        };
+
+        // --- Initialization ---
+        window.onload = function() {
+            loadData();
+            // seedDemoData call removed for production use
+            updateDashboard();
+            setupDateInputs();
+        };
+
+        // Function removed: seedDemoData()
+
+        // --- Navigation ---
+        function showView(viewName) {
+            // Hide all views
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            // Show selected
+            document.getElementById(`view-${viewName}`).classList.remove('hidden');
+            
+            // Refresh content based on view
+            if(viewName === 'inventory') renderInventory();
+            if(viewName === 'clients') renderClients();
+            if(viewName === 'settings') loadSettingsToUI();
+            if(viewName === 'dashboard') updateDashboard();
+        }
+
+        // --- Dashboard Logic ---
+        function updateDashboard() {
+            // Stats
+            document.getElementById('stat-total').innerText = db.devices.length;
+            document.getElementById('stat-available').innerText = db.devices.filter(d => d.status === 'available').length;
+            document.getElementById('stat-rented').innerText = db.rentals.filter(r => r.active).length;
+            
+            const today = new Date();
+            const overdue = db.rentals.filter(r => r.active && new Date(r.expectedReturn) < today).length;
+            document.getElementById('stat-overdue').innerText = overdue + db.clients.filter(c => c.debt > 0).length;
+
+            renderActiveRentals();
+        }
+
+        function renderActiveRentals(filterText = "") {
+            const tbody = document.getElementById('activeRentalsTableBody');
+            tbody.innerHTML = "";
+
+            const active = db.rentals.filter(r => r.active);
+            
+            active.forEach(r => {
+                const device = db.devices.find(d => d.id == r.deviceId);
+                const client = db.clients.find(c => c.id == r.clientId);
+                
+                // Search Filter
+                if (filterText) {
+                    const searchStr = (client.name + client.phone + device.name).toLowerCase();
+                    if (!searchStr.includes(filterText.toLowerCase())) return;
+                }
+
+                const isOverdue = new Date(r.expectedReturn) < new Date();
+                
+                let accessoriesIcons = "";
+                if(r.accessories.charger) accessoriesIcons += '<i class="fa-solid fa-plug text-gray-500 mr-1" title="מטען"></i>';
+                if(r.accessories.mount) accessoriesIcons += '<i class="fa-solid fa-grip-lines text-gray-500 mr-1" title="תושבת"></i>';
+
+                const row = `
+                    <tr class="bg-white border-b hover:bg-gray-50 ${isOverdue ? 'bg-red-50' : ''}">
+                        <td class="px-6 py-4 font-medium text-gray-900">${device.name}</td>
+                        <td class="px-6 py-4">
+                            <div class="font-bold">${client.name}</div>
+                            <div class="text-xs text-gray-500">${client.phone}</div>
+                        </td>
+                        <td class="px-6 py-4">${formatDateIL(r.startDate)}</td>
+                        <td class="px-6 py-4 ${isOverdue ? 'text-red-600 font-bold' : ''}">${formatDateIL(r.expectedReturn)}</td>
+                        <td class="px-6 py-4">${accessoriesIcons}</td>
+                        <td class="px-6 py-4">
+                            <button onclick="openReturnModal(${r.id})" class="font-medium text-blue-600 hover:underline">החזרה</button>
+                            <a href="https://wa.me/972${client.phone.substring(1)}?text=שלום ${client.name}, תזכורת להחזרת מכשיר הוויז" target="_blank" class="mr-2 text-green-500 hover:text-green-700"><i class="fa-brands fa-whatsapp text-lg"></i></a>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
+        function handleGlobalSearch(val) {
+            renderActiveRentals(val);
+        }
+
+        // --- Rental Flow ---
+        function openRentalModal() {
+            document.getElementById('modal-rental').classList.remove('hidden');
+            document.getElementById('modal-rental').classList.add('flex');
+            
+            // Populate Clients Datalist
+            const datalist = document.getElementById('clients-datalist');
+            datalist.innerHTML = "";
+            db.clients.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.name;
+                datalist.appendChild(opt);
+            });
+
+            // Populate Available Devices
+            const select = document.getElementById('rental-device-select');
+            select.innerHTML = "";
+            const available = db.devices.filter(d => d.status === 'available');
+            
+            if(available.length === 0) {
+                const opt = document.createElement('option');
+                opt.text = "אין מכשירים פנויים";
+                select.appendChild(opt);
+                select.disabled = true;
+            } else {
+                select.disabled = false;
+                available.forEach(d => {
+                    const opt = document.createElement('option');
+                    opt.value = d.id;
+                    opt.text = `${d.name} (${getTypeLabel(d.type)})`;
+                    select.appendChild(opt);
+                });
+            }
+
+            // Set Dates
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('rental-start-date').value = today;
+            document.getElementById('rental-end-date').value = "";
+            document.getElementById('rental-estimate').innerText = "0";
+            
+            // Clear inputs
+            document.getElementById('rental-client-name').value = "";
+            document.getElementById('rental-client-phone').value = "";
+            document.getElementById('check-insurance').checked = false;
+            document.getElementById('check-deposit').checked = false;
+            document.getElementById('client-warnings').classList.add('hidden');
+        }
+
+        function autofillClient(name) {
+            const client = db.clients.find(c => c.name === name);
+            if (client) {
+                document.getElementById('rental-client-phone').value = client.phone;
+                if(client.notes || client.blacklist) {
+                    const warn = document.getElementById('client-warnings');
+                    warn.innerText = `⚠️ שים לב: ${client.notes} ${client.blacklist ? '(ברשימה שחורה!)' : ''}`;
+                    warn.classList.remove('hidden');
+                }
+            }
+        }
+
+        function calculateEstimate() {
+            const start = new Date(document.getElementById('rental-start-date').value);
+            const end = new Date(document.getElementById('rental-end-date').value);
+            const insurance = document.getElementById('check-insurance').checked;
+
+            if (start && end && end >= start) {
+                const diffTime = Math.abs(end - start);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1; // Minimum 1 day
+                
+                const rate = db.settings.isHighSeason ? db.settings.priceHighSeason : db.settings.pricePerDay;
+                let total = diffDays * rate;
+                if(insurance) total += db.settings.insuranceCost;
+
+                document.getElementById('rental-estimate').innerText = total;
+            } else {
+                document.getElementById('rental-estimate').innerText = "0";
+            }
+        }
+
+        function submitRental() {
+            const name = document.getElementById('rental-client-name').value;
+            const phone = document.getElementById('rental-client-phone').value;
+            const deviceId = document.getElementById('rental-device-select').value;
+            
+            if (!name || !deviceId) {
+                alert("אנא מלא פרטי לקוח ובחר מכשיר");
+                return;
+            }
+
+            // Get or Create Client
+            let client = db.clients.find(c => c.name === name);
+            if (!client) {
+                client = {
+                    id: Date.now(),
+                    name: name,
+                    phone: phone,
+                    notes: "",
+                    debt: 0,
+                    blacklist: false
+                };
+                db.clients.push(client);
+            } else {
+                // Update phone if needed
+                client.phone = phone;
+            }
+
+            // Create Rental
+            const rental = {
+                id: Date.now(),
+                clientId: client.id,
+                deviceId: parseInt(deviceId),
+                startDate: document.getElementById('rental-start-date').value,
+                expectedReturn: document.getElementById('rental-end-date').value,
+                active: true,
+                accessories: {
+                    charger: document.getElementById('check-charger').checked,
+                    cable: document.getElementById('check-cable').checked,
+                    mount: document.getElementById('check-mount').checked
+                },
+                hasInsurance: document.getElementById('check-insurance').checked,
+                deposit: document.getElementById('check-deposit').checked
+            };
+
+            db.rentals.push(rental);
+
+            // Update Device Status
+            const device = db.devices.find(d => d.id == deviceId);
+            device.status = 'rented';
+
+            saveData();
+            closeModal('modal-rental');
+            updateDashboard();
+        }
+
+        // --- Return Logic ---
+        function openReturnModal(rentalId) {
+            const rental = db.rentals.find(r => r.id === rentalId);
+            const device = db.devices.find(d => d.id === rental.deviceId);
+            const client = db.clients.find(c => c.id === rental.clientId);
+
+            document.getElementById('return-rental-id').value = rentalId;
+            document.getElementById('return-device-name').innerText = device.name;
+            document.getElementById('return-client-name').innerText = client.name;
+            
+            // Default actual return date to today
+            document.getElementById('return-actual-date').value = new Date().toISOString().split('T')[0];
+            
+            document.getElementById('modal-return').classList.remove('hidden');
+            document.getElementById('modal-return').classList.add('flex');
+            
+            calculateFinalPrice();
+        }
+
+        function calculateFinalPrice() {
+            const rentalId = document.getElementById('return-rental-id').value;
+            const rental = db.rentals.find(r => r.id == rentalId);
+            
+            const start = new Date(rental.startDate);
+            const end = new Date(document.getElementById('return-actual-date').value);
+            const subtractShabbat = document.getElementById('return-shabbat').checked;
+            
+            let days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+            if (days < 1) days = 1; // Min 1 day
+            if (subtractShabbat && days > 1) days = days - 1;
+
+            const rate = db.settings.isHighSeason ? db.settings.priceHighSeason : db.settings.pricePerDay;
+            let total = days * rate;
+            
+            if(rental.hasInsurance) total += db.settings.insuranceCost;
+
+            document.getElementById('return-final-price').innerText = total;
+            return total;
+        }
+
+        function processReturn(isPaid) {
+            const rentalId = document.getElementById('return-rental-id').value;
+            const rental = db.rentals.find(r => r.id == rentalId);
+            const device = db.devices.find(d => d.id == rental.deviceId);
+            const client = db.clients.find(c => c.id == rental.clientId);
+            
+            const finalPrice = calculateFinalPrice();
+            const quality = document.getElementById('return-quality').value;
+
+            // Close Rental
+            rental.active = false;
+            rental.actualReturn = document.getElementById('return-actual-date').value;
+            rental.finalPrice = finalPrice;
+            rental.isPaid = isPaid;
+
+            // Update ROI
+            if(!device.roi) device.roi = 0;
+            device.roi += finalPrice;
+
+            // Handle Debt
+            if (!isPaid) {
+                client.debt += finalPrice;
+            }
+
+            // Update Device Status based on quality
+            if (quality === 'broken' || quality === 'gps' || quality === 'battery') {
+                device.status = 'repair';
+            } else {
+                device.status = 'available'; // Could be 'charging'
+            }
+
+            saveData();
+            closeModal('modal-return');
+            updateDashboard();
+        }
+
+        // --- Inventory Logic ---
+        function renderInventory() {
+            const grid = document.getElementById('inventoryGrid');
+            grid.innerHTML = "";
+            
+            db.devices.forEach(d => {
+                const statusColors = {
+                    'available': 'bg-green-100 text-green-800',
+                    'rented': 'bg-orange-100 text-orange-800',
+                    'repair': 'bg-red-100 text-red-800',
+                    'charging': 'bg-yellow-100 text-yellow-800'
+                };
+                
+                const statusLabels = {
+                    'available': 'זמין',
+                    'rented': 'מושכר',
+                    'repair': 'בתיקון',
+                    'charging': 'בטעינה'
+                };
+
+                const card = `
+                    <div class="card bg-white p-5 rounded-2xl shadow-sm border border-gray-100 relative">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="font-bold text-lg">${d.name}</h3>
+                                <span class="status-badge ${statusColors[d.status]}">${statusLabels[d.status]}</span>
+                            </div>
+                            <button onclick="deleteDevice(${d.id})" class="text-gray-300 hover:text-red-500"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                        
+                        <div class="space-y-2 text-sm text-gray-600">
+                            <div class="flex items-center gap-2"><i class="fa-solid fa-expand"></i> סוג: ${getTypeLabel(d.type)}</div>
+                            <div class="flex items-center gap-2"><i class="fa-solid fa-sim-card"></i> תוקף סים: ${d.simExp || '-'}</div>
+                            <div class="flex items-center gap-2 text-green-600 font-bold"><i class="fa-solid fa-sack-dollar"></i> הכניס: ₪${d.roi || 0}</div>
+                            ${d.donor ? `<div class="bg-blue-50 text-blue-800 text-xs p-1 rounded mt-2 text-center">נתרם ע"י: ${d.donor}</div>` : ''}
+                        </div>
+
+                        <div class="mt-4 pt-4 border-t flex gap-2">
+                             <button onclick="toggleDeviceStatus(${d.id})" class="flex-1 bg-gray-100 hover:bg-gray-200 py-1 rounded text-xs font-bold">שנה סטטוס</button>
+                        </div>
+                    </div>
+                `;
+                grid.innerHTML += card;
+            });
+        }
+
+        function openDeviceModal() {
+            // Simplified prompt for MVP
+            const name = prompt("שם המכשיר (למשל: וויז 12)");
+            if(name) {
+                const newDevice = {
+                    id: Date.now(),
+                    name: name,
+                    type: "screen-5",
+                    status: "available",
+                    simExp: "",
+                    roi: 0
+                };
+                db.devices.push(newDevice);
+                saveData();
+                renderInventory();
+            }
+        }
+        
+        function toggleDeviceStatus(id) {
+            const d = db.devices.find(dev => dev.id === id);
+            // Cycle: Available -> Charging -> Repair -> Available
+            if(d.status === 'available') d.status = 'charging';
+            else if(d.status === 'charging') d.status = 'repair';
+            else if(d.status === 'repair') d.status = 'available';
+            else if(d.status === 'rented') alert("לא ניתן לשנות סטטוס ידני למכשיר מושכר");
+            
+            saveData();
+            renderInventory();
+        }
+
+        // --- Clients Logic ---
+        function renderClients(filter = "") {
+            const tbody = document.getElementById('clientsTableBody');
+            tbody.innerHTML = "";
+            
+            db.clients.forEach(c => {
+                if(filter && !c.name.includes(filter)) return;
+                
+                const tr = `
+                    <tr class="bg-white border-b hover:bg-gray-50">
+                        <td class="px-6 py-4 font-bold ${c.blacklist ? 'text-red-600' : ''}">${c.name}</td>
+                        <td class="px-6 py-4">${c.phone}</td>
+                        <td class="px-6 py-4">${c.blacklist ? '<span class="bg-red-100 text-red-800 px-2 rounded text-xs">חסום</span>' : '<span class="bg-green-100 text-green-800 px-2 rounded text-xs">פעיל</span>'}</td>
+                        <td class="px-6 py-4">
+                            ${c.debt > 0 ? `<div class="text-red-600 font-bold">חוב: ₪${c.debt}</div>` : ''}
+                            <div class="text-xs text-gray-500">${c.notes}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <button onclick="editClient(${c.id})" class="text-blue-600 hover:underline">ערוך</button>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += tr;
+            });
+        }
+
+        function editClient(id) {
+            const c = db.clients.find(client => client.id === id);
+            const note = prompt("הוסף הערה ללקוח:", c.notes);
+            if(note !== null) {
+                c.notes = note;
+                const blacklist = confirm("האם לסמן לקוח זה ברשימה שחורה?");
+                c.blacklist = blacklist;
+                saveData();
+                renderClients();
+            }
+        }
+
+        // --- Settings & Utils ---
+        function loadSettingsToUI() {
+            document.getElementById('setting-price-day').value = db.settings.pricePerDay;
+            document.getElementById('setting-price-high').value = db.settings.priceHighSeason;
+            document.getElementById('setting-is-high-season').checked = db.settings.isHighSeason;
+        }
+
+        function saveSettings() {
+            db.settings.pricePerDay = parseInt(document.getElementById('setting-price-day').value);
+            db.settings.priceHighSeason = parseInt(document.getElementById('setting-price-high').value);
+            db.settings.isHighSeason = document.getElementById('setting-is-high-season').checked;
+            saveData();
+            alert("הגדרות נשמרו בהצלחה");
+        }
+
+        // Helpers
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('flex');
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function getTypeLabel(type) {
+            if(type === 'kosher') return 'כשר למהדרין';
+            if(type === 'screen-5') return 'מסך 5 אינץ\'';
+            if(type === 'screen-6') return 'מסך גדול 6+';
+            return type;
+        }
+
+        function formatDateIL(dateStr) {
+            if(!dateStr) return "-";
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' });
+        }
+
+        function setupDateInputs() {
+            // Set min date to today for inputs
+            const today = new Date().toISOString().split('T')[0];
+            document.querySelectorAll('input[type="date"]').forEach(el => el.min = today);
+        }
+
+        // --- Storage (Local + Export/Import) ---
+        function saveData() {
+            localStorage.setItem('gemachWazeDB', JSON.stringify(db));
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('gemachWazeDB');
+            if (saved) {
+                db = JSON.parse(saved);
+            }
+        }
+
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "gemach_backup_" + new Date().toISOString().slice(0,10) + ".json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function importData(input) {
+            const file = input.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    db = JSON.parse(e.target.result);
+                    saveData();
+                    alert("הנתונים נטענו בהצלחה! הדף יתרענן.");
+                    location.reload();
+                } catch(err) {
+                    alert("שגיאה בטעינת הקובץ");
+                }
+            };
+            reader.readAsText(file);
+        }
+    </script>
+</body>
+</html>
