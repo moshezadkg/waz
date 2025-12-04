@@ -141,7 +141,11 @@ tr:hover td{background:var(--gray-50)}
 .calendar-day{padding:10px;min-height:80px;background:var(--white);border:1px solid var(--gray-200);font-size:13px}
 .calendar-day.today{background:#EFF6FF;border-color:var(--primary)}
 .calendar-day-num{font-weight:600;margin-bottom:5px}
-.calendar-event{font-size:11px;padding:2px 5px;background:var(--primary);color:white;border-radius:3px;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.calendar-event{font-size:11px;padding:2px 5px;background:var(--primary);color:white;border-radius:3px;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.calendar-event.past{background:var(--gray-300);color:var(--gray-600)}
+.calendar-day{cursor:pointer;transition:background .2s}
+.calendar-day:hover{background:var(--gray-50)}
+.highlight-row{background:#FFF3CD !important;animation:highlight-pulse 1s ease-in-out 3}
 
 /* Alerts */
 .alert{padding:12px 16px;border-radius:8px;margin-bottom:15px;display:flex;align-items:center;gap:10px;font-size:14px}
@@ -167,6 +171,15 @@ tr:hover td{background:var(--gray-50)}
 .login-box .form-group{margin-bottom:15px}
 .login-box .btn{width:100%}
 .hidden{display:none !important}
+
+/* Highlight animation */
+@keyframes highlight-pulse {
+    0%, 100% { background: #FFF3CD; }
+    50% { background: #FFE69C; }
+}
+
+/* Tooltip */
+.calendar-tooltip{position:absolute;background:var(--dark);color:white;padding:8px 12px;border-radius:6px;font-size:12px;z-index:100;white-space:nowrap;pointer-events:none}
 
 /* Responsive */
 @media(max-width:900px){
@@ -223,7 +236,9 @@ tr:hover td{background:var(--gray-50)}
 <div class="nav-item" onclick="showPage('customers')">👥 לקוחות</div>
 <div class="nav-item" onclick="showPage('waitlist')">⏳ רשימת המתנה</div>
 <div class="nav-divider"></div>
+<div class="nav-item" onclick="showPage('expenses')">💸 הוצאות והכנסות</div>
 <div class="nav-item" onclick="showPage('reports')">📈 דוחות</div>
+<div class="nav-item" onclick="showPage('instructions')">📜 הוראות הגמ"ח</div>
 <div class="nav-item" onclick="showPage('settings')">⚙️ הגדרות</div>
 </nav>
 </aside>
@@ -286,6 +301,7 @@ tr:hover td{background:var(--gray-50)}
 <div class="form-group">
 <label class="required">טלפון</label>
 <input type="tel" class="form-control" id="customerPhone" required>
+<button type="button" class="btn btn-sm btn-outline" style="margin-top:8px" onclick="openCustomerModal(null, true)">➕ הוסף כלקוח חדש</button>
 </div>
 <div class="form-group">
 <label class="required">מכשיר</label>
@@ -294,6 +310,9 @@ tr:hover td{background:var(--gray-50)}
 <div class="form-group">
 <label>משך השכרה</label>
 <select class="form-control" id="rentalDuration" onchange="updateReturnDate()">
+<option value="hours">כמה שעות</option>
+<option value="evening">עד הערב</option>
+<option value="morning">עד מחר בבוקר</option>
 <option value="1">יום אחד</option>
 <option value="2">יומיים</option>
 <option value="3">3 ימים</option>
@@ -302,6 +321,10 @@ tr:hover td{background:var(--gray-50)}
 <option value="14">שבועיים</option>
 <option value="custom">תאריך ספציפי</option>
 </select>
+</div>
+<div class="form-group" id="hoursGroup" style="display:none">
+<label>שעת החזרה משוערת</label>
+<input type="time" class="form-control" id="returnTime" value="18:00">
 </div>
 <div class="form-group" id="customDateGroup" style="display:none">
 <label>תאריך החזרה</label>
@@ -328,9 +351,6 @@ tr:hover td{background:var(--gray-50)}
 </div>
 </div>
 
-<div class="form-group">
-<label class="form-check"><input type="checkbox" id="addInsurance"> ➕ ביטוח שבר (+5₪)</label>
-</div>
 
 <div class="form-group">
 <label>הערות</label>
@@ -423,7 +443,7 @@ tr:hover td{background:var(--gray-50)}
 <button class="tab" onclick="filterCustomers('subscription')">מנויים</button>
 </div>
 <table>
-<thead><tr><th>שם</th><th>טלפון</th><th>השכרות</th><th>חוב</th><th>מנוי (ימים)</th><th>הערות</th><th>פעולות</th></tr></thead>
+<thead><tr><th>שם</th><th>טלפון</th><th>השכרות</th><th>שילם סה"כ</th><th>חוב</th><th>מנוי (ימים)</th><th>הערות</th><th>פעולות</th></tr></thead>
 <tbody id="customersTable"></tbody>
 </table>
 </div>
@@ -452,6 +472,9 @@ tr:hover td{background:var(--gray-50)}
 <div id="reports" class="page">
 <div class="topbar">
 <h1 class="page-title">דוחות</h1>
+<div class="topbar-actions">
+<button class="btn btn-primary" onclick="exportReportToExcel()">📊 ייצוא לאקסל</button>
+</div>
 </div>
 <div class="card">
 <div class="card-body">
@@ -468,7 +491,62 @@ tr:hover td{background:var(--gray-50)}
 <button class="btn btn-primary" onclick="generateReport()" style="margin-top:24px">📊 הפק דוח</button>
 </div>
 </div>
+<div class="tabs" style="margin-bottom:20px">
+<button class="tab active" onclick="showReportTab('overview')">סיכום כללי</button>
+<button class="tab" onclick="showReportTab('devices')">פילוח מכשירים</button>
+<button class="tab" onclick="showReportTab('customers')">פילוח לקוחות</button>
+</div>
 <div id="reportResults"></div>
+</div>
+</div>
+</div>
+
+<!-- Expenses -->
+<div id="expenses" class="page">
+<div class="topbar">
+<h1 class="page-title">💸 הוצאות והכנסות</h1>
+<div class="topbar-actions">
+<button class="btn btn-primary" onclick="openExpenseModal()">➕ הוסף רשומה</button>
+<button class="btn btn-outline" onclick="exportExpensesToExcel()">📊 ייצוא</button>
+</div>
+</div>
+<div class="card">
+<div class="card-body">
+<div class="tabs" style="margin-bottom:15px">
+<button class="tab active" onclick="filterExpenses('all')">הכל</button>
+<button class="tab" onclick="filterExpenses('expense')">הוצאות</button>
+<button class="tab" onclick="filterExpenses('income')">הכנסות</button>
+</div>
+<div class="form-grid" style="margin-bottom:15px">
+<div class="form-group"><label>סינון לפי תאריך</label><input type="date" class="form-control" id="expenseFilterDate" onchange="filterExpenses()"></div>
+<div class="form-group"><label>סינון לפי פריט</label><input type="text" class="form-control" id="expenseFilterItem" placeholder="חפש פריט..." oninput="filterExpenses()"></div>
+</div>
+<table>
+<thead><tr><th>סוג</th><th>תיאור</th><th>פריט</th><th>סכום</th><th>תאריך</th><th>מכשיר</th><th>מקום רכישה</th><th>פעולות</th></tr></thead>
+<tbody id="expensesTable"></tbody>
+<tfoot><tr style="font-weight:bold;background:var(--gray-100)"><td colspan="3">סה"כ</td><td id="expensesTotal">₪0</td><td colspan="4"></td></tr></tfoot>
+</table>
+</div>
+</div>
+</div>
+
+<!-- Instructions -->
+<div id="instructions" class="page">
+<div class="topbar">
+<h1 class="page-title">📜 הוראות הגמ"ח</h1>
+</div>
+<div class="card">
+<div class="card-body">
+<div class="form-group">
+<label>הוראות השימוש (טקסט)</label>
+<textarea class="form-control" id="instructionsText" rows="10" placeholder="כתוב כאן את הוראות השימוש בגמ"ח..."></textarea>
+</div>
+<div class="form-group">
+<label>תמונת הוראות (URL)</label>
+<input type="text" class="form-control" id="instructionsImage" placeholder="הכנס כתובת URL לתמונה">
+</div>
+<button class="btn btn-success" onclick="saveInstructions()">💾 שמור הוראות</button>
+<div id="instructionsPreview" style="margin-top:20px"></div>
 </div>
 </div>
 </div>
@@ -480,7 +558,36 @@ tr:hover td{background:var(--gray-50)}
 </div>
 <div class="card">
 <div class="card-body">
-<h3 style="margin-bottom:15px;color:var(--primary)">פרטי הגמ"ח</h3>
+<h3 style="margin-bottom:15px;color:var(--primary)">מיתוג הגמ"ח</h3>
+<div class="form-grid">
+<div class="form-group"><label>שם הגמ"ח</label><input type="text" class="form-control" id="gmachName" placeholder="גמ"ח וויז"></div>
+<div class="form-group"><label>שם משפחה/כיתוב משנה</label><input type="text" class="form-control" id="gmachSubtitle" placeholder="משפ' צדקה"></div>
+<div class="form-group">
+<label>לוגו (כתובת תמונה)</label>
+<input type="text" class="form-control" id="gmachLogo" placeholder="לוגו.jpg">
+<small style="color:var(--gray-500)">שם קובץ או כתובת URL</small>
+</div>
+</div>
+
+<h3 style="margin:20px 0 15px;color:var(--primary)">רקע התוכנה</h3>
+<div class="form-group">
+<label>בחר רקע</label>
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+<div class="bg-option" onclick="setBackground('default')" style="width:40px;height:40px;background:var(--gray-100);border-radius:8px;cursor:pointer;border:2px solid var(--gray-300)"></div>
+<div class="bg-option" onclick="setBackground('#E3F2FD')" style="width:40px;height:40px;background:#E3F2FD;border-radius:8px;cursor:pointer;border:2px solid var(--gray-300)"></div>
+<div class="bg-option" onclick="setBackground('#F3E5F5')" style="width:40px;height:40px;background:#F3E5F5;border-radius:8px;cursor:pointer;border:2px solid var(--gray-300)"></div>
+<div class="bg-option" onclick="setBackground('#E8F5E9')" style="width:40px;height:40px;background:#E8F5E9;border-radius:8px;cursor:pointer;border:2px solid var(--gray-300)"></div>
+<div class="bg-option" onclick="setBackground('#FFF3E0')" style="width:40px;height:40px;background:#FFF3E0;border-radius:8px;cursor:pointer;border:2px solid var(--gray-300)"></div>
+<div class="bg-option" onclick="setBackground('#ECEFF1')" style="width:40px;height:40px;background:#ECEFF1;border-radius:8px;cursor:pointer;border:2px solid var(--gray-300)"></div>
+</div>
+</div>
+<div class="form-group">
+<label>או העלה תמונת רקע</label>
+<input type="text" class="form-control" id="bgImage" placeholder="כתובת URL לתמונה">
+<button class="btn btn-sm btn-outline" style="margin-top:8px" onclick="applyBgImage()">החל רקע תמונה</button>
+</div>
+
+<h3 style="margin:20px 0 15px;color:var(--primary)">פרטי בעל הגמ"ח</h3>
 <div class="form-grid">
 <div class="form-group"><label>שם בעל הגמ"ח</label><input type="text" class="form-control" id="ownerName"></div>
 <div class="form-group"><label>טלפון</label><input type="tel" class="form-control" id="ownerPhone"></div>
@@ -492,7 +599,6 @@ tr:hover td{background:var(--gray-50)}
 <div class="form-grid">
 <div class="form-group"><label>מחיר ברירת מחדל (₪)</label><input type="number" class="form-control" id="defaultPrice" value="10"></div>
 <div class="form-group"><label>קנס איחור ליום (₪)</label><input type="number" class="form-control" id="lateFee" value="5"></div>
-<div class="form-group"><label>ביטוח שבר (₪)</label><input type="number" class="form-control" id="insurancePrice" value="5"></div>
 </div>
 
 <h3 style="margin:20px 0 15px;color:var(--primary)">שבת וחגים</h3>
@@ -509,10 +615,11 @@ tr:hover td{background:var(--gray-50)}
 <input type="password" class="form-control" id="appPassword" placeholder="השאר ריק לביטול">
 </div>
 
-<div style="margin-top:25px;display:flex;gap:10px">
+<div style="margin-top:25px;display:flex;gap:10px;flex-wrap:wrap">
 <button class="btn btn-success" onclick="saveSettings()">💾 שמור הגדרות</button>
 <button class="btn btn-outline" onclick="exportData()">📤 ייצא גיבוי</button>
 <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">📥 ייבא גיבוי</button>
+<button class="btn btn-danger" onclick="resetAllData()">🗑️ אפס נתונים</button>
 <input type="file" id="importFile" style="display:none" onchange="importData(event)" accept=".json">
 </div>
 </div>
@@ -628,6 +735,83 @@ tr:hover td{background:var(--gray-50)}
 </div>
 </div>
 
+<div id="expenseModal" class="modal">
+<div class="modal-content">
+<div class="modal-header">
+<h2 id="expenseModalTitle">💸 הוספת רשומה</h2>
+<button class="modal-close" onclick="closeModal('expenseModal')">&times;</button>
+</div>
+<div class="modal-body">
+<form onsubmit="return saveExpense(event)">
+<input type="hidden" id="editExpenseId">
+<div class="form-grid">
+<div class="form-group">
+<label class="required">סוג</label>
+<select class="form-control" id="expenseType" required>
+<option value="expense">הוצאה</option>
+<option value="income">הכנסה</option>
+</select>
+</div>
+<div class="form-group"><label class="required">תיאור</label><input type="text" class="form-control" id="expenseDesc" required></div>
+<div class="form-group"><label>פריט</label><input type="text" class="form-control" id="expenseItem" placeholder="כבל, מצת, וכו'"></div>
+<div class="form-group"><label class="required">סכום (₪)</label><input type="number" class="form-control" id="expenseAmount" required></div>
+<div class="form-group"><label>תאריך</label><input type="date" class="form-control" id="expenseDate"></div>
+<div class="form-group"><label>מכשיר קשור</label><select class="form-control" id="expenseDevice"><option value="">ללא</option></select></div>
+<div class="form-group"><label>מקום רכישה</label><input type="text" class="form-control" id="expensePlace" placeholder="איפה נקנה?"></div>
+</div>
+<div class="form-group"><label>הערות</label><textarea class="form-control" id="expenseNotes" rows="2"></textarea></div>
+<div class="modal-footer" style="padding:0;border:0;margin-top:20px">
+<button type="submit" class="btn btn-success">💾 שמור</button>
+<button type="button" class="btn btn-danger" onclick="deleteExpense()" id="deleteExpenseBtn" style="display:none">🗑️ מחק</button>
+</div>
+</form>
+</div>
+</div>
+</div>
+
+<div id="customerActionsModal" class="modal">
+<div class="modal-content" style="max-width:400px">
+<div class="modal-header">
+<h2 id="customerActionsTitle">👤 פעולות לקוח</h2>
+<button class="modal-close" onclick="closeModal('customerActionsModal')">&times;</button>
+</div>
+<div class="modal-body" id="customerActionsContent"></div>
+</div>
+</div>
+
+<div id="deviceNeedsModal" class="modal">
+<div class="modal-content">
+<div class="modal-header">
+<h2>🔧 ציוד נדרש למכשיר</h2>
+<button class="modal-close" onclick="closeModal('deviceNeedsModal')">&times;</button>
+</div>
+<div class="modal-body" id="deviceNeedsContent"></div>
+</div>
+</div>
+
+<div id="reserveModal" class="modal">
+<div class="modal-content">
+<div class="modal-header">
+<h2>📅 שמירת מכשיר</h2>
+<button class="modal-close" onclick="closeModal('reserveModal')">&times;</button>
+</div>
+<div class="modal-body">
+<form onsubmit="return saveReservation(event)">
+<div class="form-grid">
+<div class="form-group"><label class="required">שם לקוח</label><input type="text" class="form-control" id="reserveName" required></div>
+<div class="form-group"><label class="required">טלפון</label><input type="tel" class="form-control" id="reservePhone" required></div>
+<div class="form-group"><label>מכשיר</label><select class="form-control" id="reserveDevice"></select></div>
+<div class="form-group"><label class="required">תאריך שמירה</label><input type="date" class="form-control" id="reserveDate" required></div>
+</div>
+<div class="form-group"><label>הערות</label><textarea class="form-control" id="reserveNotes" rows="2"></textarea></div>
+<div class="modal-footer" style="padding:0;border:0;margin-top:20px">
+<button type="submit" class="btn btn-success">💾 שמור</button>
+</div>
+</form>
+</div>
+</div>
+</div>
+
 <script src="לוח שנה עברי.js"></script>
 <script>
 // תאריך עברי אמיתי באמצעות קובץ לוח שנה עברי.js
@@ -653,21 +837,40 @@ function formatDate(dateStr) {
     return new Date(dateStr).toLocaleDateString('he-IL');
 }
 
+function getDayName(dateStr) {
+    if (!dateStr) return '';
+    const days = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+    return 'יום ' + days[new Date(dateStr).getDay()];
+}
+
+function formatDateTime(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('he-IL') + ' ' + date.toLocaleTimeString('he-IL', {hour: '2-digit', minute: '2-digit'});
+}
+
 // נתונים
 let data = {
     devices: [],
     customers: [],
     rentals: [],
     waitlist: [],
+    expenses: [],
+    instructions: { text: '', image: '' },
     settings: {
         defaultPrice: 10,
         lateFee: 5,
-        insurancePrice: 5,
         skipShabbat: true,
         skipHolidays: true,
-        password: ''
+        password: '',
+        gmachName: 'גמ"ח וויז',
+        gmachSubtitle: 'משפ\' צדקה',
+        gmachLogo: 'לוגו.jpg',
+        bgColor: 'default'
     }
 };
+
+let currentReportTab = 'overview';
 
 let currentCalendarDate = new Date();
 
@@ -682,6 +885,8 @@ function loadData() {
             customers: loaded.customers || [],
             rentals: loaded.rentals || [],
             waitlist: loaded.waitlist || [],
+            expenses: loaded.expenses || [],
+            instructions: loaded.instructions || { text: '', image: '' },
             settings: {
                 ...data.settings, // שמירה על ברירות מחדל
                 ...loaded.settings // עדכון מהנתונים שנשמרו
@@ -698,8 +903,34 @@ function loadData() {
         document.querySelector('.app').style.display = 'flex';
     }
     
+    // החל רקע שמור
+    if (data.settings.bgColor && data.settings.bgColor !== 'default') {
+        document.body.style.background = data.settings.bgColor;
+    }
+    if (data.settings.bgImage) {
+        document.body.style.backgroundImage = `url(${data.settings.bgImage})`;
+        document.body.style.backgroundSize = 'cover';
+    }
+    
+    // עדכון שם וסאבטייטל
+    updateBranding();
+    
     updateAll();
     loadSettings();
+    loadInstructions();
+}
+
+function updateBranding() {
+    const name = data.settings.gmachName || 'גמ"ח וויז';
+    const subtitle = data.settings.gmachSubtitle || 'משפ\' צדקה';
+    const logo = data.settings.gmachLogo || 'לוגו.jpg';
+    
+    document.querySelectorAll('.sidebar-header h1').forEach(el => el.textContent = name);
+    document.querySelectorAll('.sidebar-header span').forEach(el => el.textContent = subtitle);
+    document.querySelectorAll('.sidebar-header img').forEach(el => el.src = logo);
+    document.querySelectorAll('.login-box img').forEach(el => el.src = logo);
+    document.querySelectorAll('.login-box h2').forEach(el => el.textContent = name + ' - ' + subtitle);
+    document.title = name + ' - ' + subtitle;
 }
 
 function checkPassword() {
@@ -752,6 +983,7 @@ function updateAll() {
     updateCustomersTable();
     updateWaitlistTable();
     updateDeviceSelects();
+    updateExpensesTable();
     checkAlerts();
 }
 
@@ -896,7 +1128,23 @@ function selectCustomer(id) {
 // עדכון תאריך החזרה
 function updateReturnDate() {
     const duration = document.getElementById('rentalDuration').value;
-    document.getElementById('customDateGroup').style.display = duration === 'custom' ? 'block' : 'none';
+    const hoursGroup = document.getElementById('hoursGroup');
+    const customGroup = document.getElementById('customDateGroup');
+    
+    hoursGroup.style.display = 'none';
+    customGroup.style.display = 'none';
+    
+    if (duration === 'custom') {
+        customGroup.style.display = 'block';
+    } else if (duration === 'hours' || duration === 'evening' || duration === 'morning') {
+        hoursGroup.style.display = 'block';
+        // הגדר ברירות מחדל
+        if (duration === 'evening') {
+            document.getElementById('returnTime').value = '19:00';
+        } else if (duration === 'morning') {
+            document.getElementById('returnTime').value = '09:00';
+        }
+    }
 }
 
 // חישוב ימי חיוב (ללא שבתות/חגים)
@@ -941,13 +1189,23 @@ function createRental(e) {
         data.customers.push(customer);
     }
     
-    // תאריכים
+    // תאריכים ושעות
     const startDate = new Date().toISOString().split('T')[0];
+    const startTime = new Date().toLocaleTimeString('he-IL', {hour: '2-digit', minute: '2-digit'});
     let expectedReturn;
+    let expectedTime = '';
     const duration = document.getElementById('rentalDuration').value;
     
     if (duration === 'custom') {
         expectedReturn = document.getElementById('customReturnDate').value;
+    } else if (duration === 'hours' || duration === 'evening') {
+        expectedReturn = startDate; // אותו יום
+        expectedTime = document.getElementById('returnTime').value;
+    } else if (duration === 'morning') {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        expectedReturn = tomorrow.toISOString().split('T')[0];
+        expectedTime = document.getElementById('returnTime').value;
     } else {
         const returnDate = new Date();
         returnDate.setDate(returnDate.getDate() + parseInt(duration));
@@ -960,12 +1218,6 @@ function createRental(e) {
     
     // מחיר
     let price = parseFloat(document.getElementById('rentalPrice').value) || device.price || 10;
-    
-    // ביטוח
-    const hasInsurance = document.getElementById('addInsurance').checked;
-    if (hasInsurance) {
-        price += data.settings.insurancePrice || 5;
-    }
     
     // בדיקת מנוי
     if (customer.subscription > 0) {
@@ -992,10 +1244,11 @@ function createRental(e) {
         deviceId,
         deviceNumber: device.number,
         startDate,
+        startTime,
         expectedReturn,
+        expectedTime,
         returnDate: null,
         price,
-        hasInsurance,
         accessories,
         notes: document.getElementById('rentalNotes').value
     };
@@ -1016,6 +1269,14 @@ function toggleOtherAccessory() {
     document.getElementById('otherAccessoryGroup').style.display = checked ? 'block' : 'none';
     if (!checked) {
         document.getElementById('accOtherText').value = '';
+    }
+}
+
+function toggleComplaintOther() {
+    const checked = document.getElementById('complaintOther').checked;
+    document.getElementById('complaintOtherText').style.display = checked ? 'block' : 'none';
+    if (!checked) {
+        document.getElementById('complaintOtherText').value = '';
     }
 }
 
@@ -1074,6 +1335,18 @@ function showEndRentalDetails() {
             <label class="form-check"><input type="checkbox" id="endRentalPaid"> שולם</label>
         </div>
         <div class="form-group">
+            <label>דיווח על בעיות</label>
+            <div class="checkbox-grid">
+                <label class="form-check"><input type="checkbox" id="complaintBattery"> סוללה נגמרת מהר</label>
+                <label class="form-check"><input type="checkbox" id="complaintCable"> כבל תקול</label>
+                <label class="form-check"><input type="checkbox" id="complaintCharger"> ללא מצת</label>
+                <label class="form-check"><input type="checkbox" id="complaintNoSignal"> אין רשת</label>
+                <label class="form-check"><input type="checkbox" id="complaintNoGPS"> לא קולט GPS</label>
+                <label class="form-check"><input type="checkbox" id="complaintOther" onchange="toggleComplaintOther()"> אחר</label>
+            </div>
+            <input type="text" class="form-control" id="complaintOtherText" placeholder="פרט בעיה אחרת..." style="margin-top:8px;display:none">
+        </div>
+        <div class="form-group">
             <label>הערות החזרה</label>
             <textarea class="form-control" id="endRentalNotes" rows="2"></textarea>
         </div>
@@ -1091,21 +1364,38 @@ function processEndRental(rentalId) {
     const device = data.devices.find(d => d.id === rental.deviceId);
     
     rental.returnDate = new Date().toISOString().split('T')[0];
+    rental.returnTime = new Date().toLocaleTimeString('he-IL', {hour: '2-digit', minute: '2-digit'});
     rental.amount = parseFloat(document.getElementById('endRentalAmount').value);
     rental.paid = document.getElementById('endRentalPaid').checked;
     rental.returnNotes = document.getElementById('endRentalNotes').value;
+    
+    // איסוף תלונות
+    rental.complaints = {
+        battery: document.getElementById('complaintBattery')?.checked,
+        cable: document.getElementById('complaintCable')?.checked,
+        charger: document.getElementById('complaintCharger')?.checked,
+        noSignal: document.getElementById('complaintNoSignal')?.checked,
+        noGPS: document.getElementById('complaintNoGPS')?.checked,
+        other: document.getElementById('complaintOther')?.checked ? document.getElementById('complaintOtherText')?.value : ''
+    };
     
     device.status = 'available';
     device.revenue = (device.revenue || 0) + (rental.paid ? rental.amount : 0);
     
     // עדכון בריאות סוללה
-    if (rental.returnNotes?.includes('סוללה')) {
+    if (rental.complaints.battery || rental.returnNotes?.includes('סוללה')) {
         device.batteryComplaints = (device.batteryComplaints || 0) + 1;
         if (device.batteryComplaints >= 3) {
             device.status = 'repair';
             alert('⚠️ המכשיר הועבר לתיקון - 3 תלונות סוללה');
         }
     }
+    
+    // עדכון תלונות כלליות במכשיר
+    if (rental.complaints.cable) device.cableComplaints = (device.cableComplaints || 0) + 1;
+    if (rental.complaints.charger) device.chargerComplaints = (device.chargerComplaints || 0) + 1;
+    if (rental.complaints.noSignal) device.signalComplaints = (device.signalComplaints || 0) + 1;
+    if (rental.complaints.noGPS) device.gpsComplaints = (device.gpsComplaints || 0) + 1;
     
     if (!rental.paid) {
         customer.debt = (customer.debt || 0) + rental.amount;
@@ -1145,15 +1435,25 @@ function quickEndRental(rentalId) {
 async function openEditRental(rentalId) {
     const rental = data.rentals.find(r => r.id === rentalId);
     const customer = data.customers.find(c => c.id === rental.customerId);
+    const hebrewStart = getHebrewDate(rental.startDate);
+    const hebrewExpected = getHebrewDate(rental.expectedReturn);
+    const dayName = getDayName(rental.expectedReturn);
     
     document.getElementById('editRentalContent').innerHTML = `
         <div style="background:var(--gray-50);padding:15px;border-radius:8px;margin-bottom:15px">
             <p><strong>לקוח:</strong> ${customer?.name}</p>
             <p><strong>מכשיר:</strong> ${rental.deviceNumber}</p>
+            <p><strong>התחלה:</strong> ${formatDate(rental.startDate)} - ${getDayName(rental.startDate)} (${hebrewStart})</p>
+            <p><strong>שעת יציאה:</strong> ${rental.startTime || 'לא צוין'}</p>
         </div>
         <div class="form-group">
-            <label>תאריך החזרה</label>
-            <input type="date" class="form-control" id="editExpectedReturn" value="${rental.expectedReturn}">
+            <label>תאריך החזרה (${dayName})</label>
+            <input type="date" class="form-control" id="editExpectedReturn" value="${rental.expectedReturn}" onchange="updateReturnDayName()">
+            <small id="returnDayName" style="color:var(--gray-500)">${hebrewExpected}</small>
+        </div>
+        <div class="form-group">
+            <label>שעת החזרה משוערת</label>
+            <input type="time" class="form-control" id="editReturnTime" value="${rental.expectedTime || ''}">
         </div>
         <div class="form-group">
             <label>הוסף ימים</label>
@@ -1168,9 +1468,20 @@ async function openEditRental(rentalId) {
             <label>מחיר ליום (₪)</label>
             <input type="number" class="form-control" id="editRentalPrice" value="${rental.price}">
         </div>
+        <div class="form-group">
+            <label>הערות</label>
+            <textarea class="form-control" id="editRentalNotes" rows="2">${rental.notes || ''}</textarea>
+        </div>
         <button class="btn btn-success" onclick="saveEditRental('${rentalId}')">💾 שמור</button>
     `;
     openModal('editRentalModal');
+}
+
+function updateReturnDayName() {
+    const date = document.getElementById('editExpectedReturn').value;
+    const hebrew = getHebrewDate(date);
+    const dayName = getDayName(date);
+    document.getElementById('returnDayName').textContent = dayName + ' - ' + hebrew;
 }
 
 function addDaysToRental(days) {
@@ -1183,7 +1494,9 @@ function addDaysToRental(days) {
 function saveEditRental(rentalId) {
     const rental = data.rentals.find(r => r.id === rentalId);
     rental.expectedReturn = document.getElementById('editExpectedReturn').value;
+    rental.expectedTime = document.getElementById('editReturnTime')?.value || '';
     rental.price = parseFloat(document.getElementById('editRentalPrice').value);
+    rental.notes = document.getElementById('editRentalNotes')?.value || '';
     saveData();
     updateAll();
     closeModal('editRentalModal');
@@ -1262,27 +1575,85 @@ function renderCalendar() {
     for (let day = 1; day <= lastDay.getDate(); day++) {
         const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
         const isToday = dateStr === today;
+        const isPast = dateStr < today;
         
         // המרה לעברי
         const hebrewDate = convertToHebrew(day, month + 1, year);
         const hebrewDay = hebrewDate ? hebrewDate.day : day;
         const hebrewMonth = hebrewDate ? hebrewDate.month : '';
         
-        // מצא השכרות ליום הזה
+        // מצא השכרות פעילות ליום הזה
         const dayRentals = data.rentals.filter(r => {
             if (r.returnDate) return false;
             return r.startDate <= dateStr && r.expectedReturn >= dateStr;
         });
         
-        html += `<div class="calendar-day ${isToday ? 'today' : ''}">
+        // מצא השכרות שהסתיימו (לצבע חלש)
+        const pastRentals = data.rentals.filter(r => {
+            if (!r.returnDate) return false;
+            return r.startDate <= dateStr && r.expectedReturn >= dateStr;
+        });
+        
+        // יצירת תיאור לhover
+        let tooltip = '';
+        if (dayRentals.length > 0) {
+            dayRentals.forEach(r => {
+                const customer = data.customers.find(c => c.id === r.customerId);
+                tooltip += `${r.deviceNumber}: ${customer?.name || 'לקוח'} (עד ${formatDate(r.expectedReturn)})\\n`;
+            });
+        }
+        
+        html += `<div class="calendar-day ${isToday ? 'today' : ''}" 
+            onclick="openRentalForDate('${dateStr}')"
+            onmouseenter="showCalendarTooltip(event, '${tooltip.replace(/'/g, "\\'")}')"
+            onmouseleave="hideCalendarTooltip()">
             <div class="calendar-day-num">${day}</div>
             <div style="font-size:11px;color:var(--gray-500);margin-top:2px">${hebrewDay} ${hebrewMonth}</div>
+            ${pastRentals.slice(0,1).map(r => `<div class="calendar-event past">${r.deviceNumber}</div>`).join('')}
             ${dayRentals.slice(0,2).map(r => `<div class="calendar-event">${r.deviceNumber}</div>`).join('')}
             ${dayRentals.length > 2 ? `<div style="font-size:10px;color:var(--gray-500)">+${dayRentals.length-2} עוד</div>` : ''}
         </div>`;
     }
     
     document.getElementById('calendarGrid').innerHTML = html;
+}
+
+function showCalendarTooltip(event, text) {
+    if (!text || text.trim() === '') return;
+    
+    let tooltip = document.getElementById('calendarTooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'calendarTooltip';
+        tooltip.className = 'calendar-tooltip';
+        document.body.appendChild(tooltip);
+    }
+    
+    tooltip.innerHTML = text.replace(/\\n/g, '<br>');
+    tooltip.style.display = 'block';
+    tooltip.style.left = (event.pageX + 10) + 'px';
+    tooltip.style.top = (event.pageY + 10) + 'px';
+}
+
+function hideCalendarTooltip() {
+    const tooltip = document.getElementById('calendarTooltip');
+    if (tooltip) tooltip.style.display = 'none';
+}
+
+function openRentalForDate(dateStr) {
+    // בדיקה אם יש מכשירים זמינים
+    const available = data.devices.filter(d => d.status === 'available');
+    if (available.length === 0) {
+        alert('אין מכשירים זמינים כרגע');
+        return;
+    }
+    
+    showPage('newRental');
+    setTimeout(() => {
+        document.getElementById('rentalDuration').value = 'custom';
+        document.getElementById('customDateGroup').style.display = 'block';
+        document.getElementById('customReturnDate').value = dateStr;
+    }, 100);
 }
 
 function changeMonth(delta) {
@@ -1306,6 +1677,7 @@ function updateDevicesTable(filter = 'all') {
         const simDays = d.simDate ? Math.ceil((new Date(d.simDate) - new Date()) / (1000*60*60*24)) : null;
         const simStatus = simDays === null ? '-' : (simDays <= 7 ? `🔴 ${simDays}d` : `🟢 ${simDays}d`);
         const roiMet = d.revenue >= (d.cost || 0);
+        const needsCount = (d.needs || []).length;
         
         return `<tr>
             <td><strong>${d.number}</strong></td>
@@ -1318,9 +1690,54 @@ function updateDevicesTable(filter = 'all') {
             <td style="color:${roiMet ? 'var(--success)' : ''}">₪${d.revenue || 0}</td>
             <td>
                 <button class="btn btn-sm btn-outline" onclick="editDevice('${d.id}')">✏️</button>
+                <button class="btn btn-sm btn-outline" onclick="openDeviceNeeds('${d.id}')" title="ציוד נדרש">${needsCount > 0 ? '🔧' + needsCount : '🔧'}</button>
             </td>
         </tr>`;
     }).join('');
+}
+
+function openDeviceNeeds(deviceId) {
+    const device = data.devices.find(d => d.id === deviceId);
+    if (!device) return;
+    
+    document.getElementById('deviceNeedsContent').innerHTML = `
+        <div style="margin-bottom:15px"><strong>מכשיר:</strong> ${device.number}</div>
+        <div class="form-group">
+            <label>ציוד נדרש למכשיר זה</label>
+            <div class="checkbox-grid">
+                <label class="form-check"><input type="checkbox" id="needCable" ${device.needs?.includes('cable') ? 'checked' : ''}> כבל טעינה</label>
+                <label class="form-check"><input type="checkbox" id="needCharger" ${device.needs?.includes('charger') ? 'checked' : ''}> מצת לרכב</label>
+                <label class="form-check"><input type="checkbox" id="needMagnet" ${device.needs?.includes('magnet') ? 'checked' : ''}> מגנט</label>
+                <label class="form-check"><input type="checkbox" id="needArm" ${device.needs?.includes('arm') ? 'checked' : ''}> זרוע לרכב</label>
+                <label class="form-check"><input type="checkbox" id="needCase" ${device.needs?.includes('case') ? 'checked' : ''}> נרתיק</label>
+                <label class="form-check"><input type="checkbox" id="needBattery" ${device.needs?.includes('battery') ? 'checked' : ''}> סוללה חדשה</label>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>הערות נוספות</label>
+            <textarea class="form-control" id="needsNotes" rows="2">${device.needsNotes || ''}</textarea>
+        </div>
+        <button class="btn btn-success" onclick="saveDeviceNeeds('${deviceId}')">💾 שמור</button>
+    `;
+    openModal('deviceNeedsModal');
+}
+
+function saveDeviceNeeds(deviceId) {
+    const device = data.devices.find(d => d.id === deviceId);
+    const needs = [];
+    if (document.getElementById('needCable').checked) needs.push('cable');
+    if (document.getElementById('needCharger').checked) needs.push('charger');
+    if (document.getElementById('needMagnet').checked) needs.push('magnet');
+    if (document.getElementById('needArm').checked) needs.push('arm');
+    if (document.getElementById('needCase').checked) needs.push('case');
+    if (document.getElementById('needBattery').checked) needs.push('battery');
+    
+    device.needs = needs;
+    device.needsNotes = document.getElementById('needsNotes').value;
+    
+    saveData();
+    updateDevicesTable();
+    closeModal('deviceNeedsModal');
 }
 
 function filterDevices(filter) {
@@ -1408,19 +1825,27 @@ function updateCustomersTable(filter = 'all') {
     
     const tbody = document.getElementById('customersTable');
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--gray-500)">אין לקוחות</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--gray-500)">אין לקוחות</td></tr>';
         return;
     }
     
-    tbody.innerHTML = filtered.map(c => `<tr>
-        <td><strong>${c.name}</strong></td>
-        <td>${c.phone}</td>
-        <td>${c.rentals || 0}</td>
-        <td style="color:${c.debt > 0 ? 'var(--danger)' : 'var(--success)'}">₪${c.debt || 0}</td>
-        <td>${c.subscription || 0}</td>
-        <td>${c.notes || '-'}</td>
-        <td><button class="btn btn-sm btn-outline" onclick="editCustomer('${c.id}')">✏️</button></td>
-    </tr>`).join('');
+    tbody.innerHTML = filtered.map(c => {
+        // חישוב סה"כ שילם
+        const totalPaid = data.rentals
+            .filter(r => r.customerId === c.id && r.paid)
+            .reduce((sum, r) => sum + (r.amount || 0), 0);
+        
+        return `<tr onclick="openCustomerActions('${c.id}')" style="cursor:pointer">
+            <td><strong>${c.name}</strong></td>
+            <td>${c.phone}</td>
+            <td>${c.rentals || 0}</td>
+            <td style="color:var(--success)">₪${totalPaid}</td>
+            <td style="color:${c.debt > 0 ? 'var(--danger)' : 'var(--success)'}">₪${c.debt || 0}</td>
+            <td>${c.subscription || 0}</td>
+            <td>${c.notes || '-'}</td>
+            <td><button class="btn btn-sm btn-outline" onclick="event.stopPropagation();openCustomerModal('${c.id}')">✏️</button></td>
+        </tr>`;
+    }).join('');
 }
 
 function filterCustomers(filter) {
@@ -1429,7 +1854,7 @@ function filterCustomers(filter) {
     updateCustomersTable(filter);
 }
 
-function openCustomerModal(id = null) {
+function openCustomerModal(id = null, copyFromRental = false) {
     document.getElementById('editCustomerId').value = id || '';
     document.getElementById('customerModalTitle').textContent = id ? '✏️ עריכת לקוח' : '👤 הוספת לקוח';
     document.getElementById('deleteCustomerBtn').style.display = id ? 'inline-block' : 'none';
@@ -1442,6 +1867,14 @@ function openCustomerModal(id = null) {
         document.getElementById('custDebt').value = c.debt || 0;
         document.getElementById('custSubscription').value = c.subscription || 0;
         document.getElementById('custNotes').value = c.notes || '';
+    } else if (copyFromRental) {
+        // העתק פרטים מטופס השכרה חדשה
+        document.getElementById('custName').value = document.getElementById('customerName')?.value || '';
+        document.getElementById('custPhone').value = document.getElementById('customerPhone')?.value || '';
+        document.getElementById('custAddress').value = '';
+        document.getElementById('custDebt').value = 0;
+        document.getElementById('custSubscription').value = 0;
+        document.getElementById('custNotes').value = '';
     } else {
         ['custName','custPhone','custAddress','custNotes'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('custDebt').value = 0;
@@ -1550,6 +1983,13 @@ function createRentalFromWaitlist(id) {
 }
 
 // דוחות
+function showReportTab(tab) {
+    currentReportTab = tab;
+    document.querySelectorAll('#reports .tab').forEach(t => t.classList.remove('active'));
+    event?.target?.classList?.add('active');
+    generateReport();
+}
+
 function generateReport() {
     const from = document.getElementById('reportFrom').value;
     const to = document.getElementById('reportTo').value;
@@ -1561,13 +2001,117 @@ function generateReport() {
     const totalRevenue = filtered.filter(r => r.paid).reduce((sum, r) => sum + (r.amount || 0), 0);
     const totalRentals = filtered.length;
     
-    document.getElementById('reportResults').innerHTML = `
-        <div class="stats-grid">
-            <div class="stat-card"><div class="stat-icon green">💰</div><div class="stat-info"><h3>₪${totalRevenue}</h3><p>הכנסות</p></div></div>
-            <div class="stat-card"><div class="stat-icon blue">📋</div><div class="stat-info"><h3>${totalRentals}</h3><p>השכרות</p></div></div>
-            <div class="stat-card"><div class="stat-icon orange">📊</div><div class="stat-info"><h3>₪${totalRentals > 0 ? Math.round(totalRevenue/totalRentals) : 0}</h3><p>ממוצע להשכרה</p></div></div>
-        </div>
-    `;
+    let html = '';
+    
+    if (currentReportTab === 'overview') {
+        html = `
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-icon green">💰</div><div class="stat-info"><h3>₪${totalRevenue}</h3><p>הכנסות</p></div></div>
+                <div class="stat-card"><div class="stat-icon blue">📋</div><div class="stat-info"><h3>${totalRentals}</h3><p>השכרות</p></div></div>
+                <div class="stat-card"><div class="stat-icon orange">📊</div><div class="stat-info"><h3>₪${totalRentals > 0 ? Math.round(totalRevenue/totalRentals) : 0}</h3><p>ממוצע להשכרה</p></div></div>
+            </div>
+        `;
+    } else if (currentReportTab === 'devices') {
+        // פילוח לפי מכשיר
+        const deviceStats = {};
+        data.devices.forEach(d => {
+            deviceStats[d.id] = { 
+                number: d.number, 
+                revenue: 0, 
+                rentals: 0, 
+                complaints: d.batteryComplaints || 0,
+                model: d.model || ''
+            };
+        });
+        filtered.forEach(r => {
+            if (deviceStats[r.deviceId]) {
+                deviceStats[r.deviceId].revenue += r.paid ? (r.amount || 0) : 0;
+                deviceStats[r.deviceId].rentals++;
+            }
+        });
+        
+        html = `<table>
+            <thead><tr><th>מכשיר</th><th>דגם</th><th>השכרות</th><th>הכנסות</th><th>תלונות סוללה</th></tr></thead>
+            <tbody>
+            ${Object.values(deviceStats).map(d => `
+                <tr>
+                    <td>${d.number}</td>
+                    <td>${d.model}</td>
+                    <td>${d.rentals}</td>
+                    <td>₪${d.revenue}</td>
+                    <td>${d.complaints > 0 ? '<span style="color:var(--danger)">' + d.complaints + '</span>' : '0'}</td>
+                </tr>
+            `).join('')}
+            </tbody>
+        </table>`;
+    } else if (currentReportTab === 'customers') {
+        // פילוח לפי לקוח
+        const customerStats = {};
+        data.customers.forEach(c => {
+            const custRentals = data.rentals.filter(r => r.customerId === c.id);
+            const totalPaid = custRentals.filter(r => r.paid).reduce((sum, r) => sum + (r.amount || 0), 0);
+            const lateCount = custRentals.filter(r => r.returnDate && new Date(r.returnDate) > new Date(r.expectedReturn)).length;
+            const noChargeCount = custRentals.filter(r => r.returnNotes?.includes('סוללה') || r.complaints?.battery).length;
+            
+            customerStats[c.id] = {
+                name: c.name,
+                phone: c.phone,
+                rentals: custRentals.length,
+                paid: totalPaid,
+                debt: c.debt || 0,
+                lateCount,
+                noChargeCount
+            };
+        });
+        
+        // מיון לפי מספר השכרות
+        const sorted = Object.values(customerStats).sort((a, b) => b.rentals - a.rentals);
+        
+        html = `
+            <div class="stats-grid" style="margin-bottom:20px">
+                <div class="stat-card"><div class="stat-icon blue">👑</div><div class="stat-info"><h3>${sorted[0]?.name || '-'}</h3><p>הלקוח הכי משכיר</p></div></div>
+            </div>
+            <table>
+            <thead><tr><th>לקוח</th><th>טלפון</th><th>השכרות</th><th>שילם סה"כ</th><th>חוב</th><th>איחורים</th><th>החזיר ללא טעינה</th></tr></thead>
+            <tbody>
+            ${sorted.map(c => `
+                <tr>
+                    <td>${c.name}</td>
+                    <td>${c.phone}</td>
+                    <td>${c.rentals}</td>
+                    <td>₪${c.paid}</td>
+                    <td>${c.debt > 0 ? '<span style="color:var(--danger)">₪' + c.debt + '</span>' : '₪0'}</td>
+                    <td>${c.lateCount > 0 ? '<span style="color:var(--warning)">' + c.lateCount + '</span>' : '0'}</td>
+                    <td>${c.noChargeCount}</td>
+                </tr>
+            `).join('')}
+            </tbody>
+        </table>`;
+    }
+    
+    document.getElementById('reportResults').innerHTML = html;
+}
+
+function exportReportToExcel() {
+    const from = document.getElementById('reportFrom').value;
+    const to = document.getElementById('reportTo').value;
+    
+    let filtered = data.rentals.filter(r => r.returnDate);
+    if (from) filtered = filtered.filter(r => r.startDate >= from);
+    if (to) filtered = filtered.filter(r => r.startDate <= to);
+    
+    let csv = '\ufeff'; // BOM for Excel Hebrew
+    csv += 'מכשיר,לקוח,התחלה,סיום,סכום,שולם,הערות\n';
+    filtered.forEach(r => {
+        const customer = data.customers.find(c => c.id === r.customerId);
+        csv += `${r.deviceNumber},${customer?.name || ''},${r.startDate},${r.returnDate},${r.amount || 0},${r.paid ? 'כן' : 'לא'},${r.returnNotes || ''}\n`;
+    });
+    
+    const blob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `דוח-השכרות-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
 }
 
 // ייצוא
@@ -1592,7 +2136,6 @@ function loadSettings() {
     const s = data.settings;
     document.getElementById('defaultPrice').value = s.defaultPrice || 10;
     document.getElementById('lateFee').value = s.lateFee || 5;
-    document.getElementById('insurancePrice').value = s.insurancePrice || 5;
     document.getElementById('skipShabbat').checked = s.skipShabbat !== false;
     document.getElementById('skipHolidays').checked = s.skipHolidays !== false;
     document.getElementById('appPassword').value = s.password || '';
@@ -1600,22 +2143,31 @@ function loadSettings() {
     document.getElementById('ownerPhone').value = s.ownerPhone || '';
     document.getElementById('ownerCity').value = s.ownerCity || '';
     document.getElementById('ownerDedication').value = s.ownerDedication || '';
+    document.getElementById('gmachName').value = s.gmachName || 'גמ"ח וויז';
+    document.getElementById('gmachSubtitle').value = s.gmachSubtitle || 'משפ\' צדקה';
+    document.getElementById('gmachLogo').value = s.gmachLogo || 'לוגו.jpg';
+    document.getElementById('bgImage').value = s.bgImage || '';
 }
 
 function saveSettings() {
     data.settings = {
+        ...data.settings, // שמירה על הגדרות קיימות
         defaultPrice: parseFloat(document.getElementById('defaultPrice').value) || 10,
         lateFee: parseFloat(document.getElementById('lateFee').value) || 5,
-        insurancePrice: parseFloat(document.getElementById('insurancePrice').value) || 5,
         skipShabbat: document.getElementById('skipShabbat').checked,
         skipHolidays: document.getElementById('skipHolidays').checked,
         password: document.getElementById('appPassword').value,
         ownerName: document.getElementById('ownerName').value,
         ownerPhone: document.getElementById('ownerPhone').value,
         ownerCity: document.getElementById('ownerCity').value,
-        ownerDedication: document.getElementById('ownerDedication').value
+        ownerDedication: document.getElementById('ownerDedication').value,
+        gmachName: document.getElementById('gmachName').value,
+        gmachSubtitle: document.getElementById('gmachSubtitle').value,
+        gmachLogo: document.getElementById('gmachLogo').value,
+        bgImage: document.getElementById('bgImage').value
     };
     saveData();
+    updateBranding();
     alert('✅ ההגדרות נשמרו!');
 }
 
@@ -1646,14 +2198,323 @@ function globalSearch(query) {
     if (!query || query.length < 2) return;
     query = query.toLowerCase();
     
+    // הדגשת תוצאות
+    document.querySelectorAll('.highlight-row').forEach(el => el.classList.remove('highlight-row'));
+    
     if (data.rentals.some(r => !r.returnDate && r.deviceNumber.toLowerCase().includes(query))) {
         filterRentals('active');
         showPage('rentals');
     } else if (data.customers.some(c => c.name.toLowerCase().includes(query) || c.phone.includes(query))) {
         showPage('customers');
+        setTimeout(() => {
+            const rows = document.querySelectorAll('#customersTable tr');
+            rows.forEach(row => {
+                if (row.textContent.toLowerCase().includes(query)) {
+                    row.classList.add('highlight-row');
+                    row.scrollIntoView({behavior: 'smooth', block: 'center'});
+                }
+            });
+        }, 100);
     } else if (data.devices.some(d => d.number.toLowerCase().includes(query))) {
         showPage('devices');
     }
+}
+
+// הוצאות והכנסות
+function openExpenseModal(id = null) {
+    document.getElementById('editExpenseId').value = id || '';
+    document.getElementById('expenseModalTitle').textContent = id ? '✏️ עריכת רשומה' : '💸 הוספת רשומה';
+    document.getElementById('deleteExpenseBtn').style.display = id ? 'inline-flex' : 'none';
+    
+    // עדכון רשימת מכשירים
+    const deviceSelect = document.getElementById('expenseDevice');
+    deviceSelect.innerHTML = '<option value="">ללא</option>' + 
+        data.devices.map(d => `<option value="${d.id}">${d.number}</option>`).join('');
+    
+    if (id) {
+        const expense = data.expenses.find(e => e.id === id);
+        document.getElementById('expenseType').value = expense.type;
+        document.getElementById('expenseDesc').value = expense.description;
+        document.getElementById('expenseItem').value = expense.item || '';
+        document.getElementById('expenseAmount').value = expense.amount;
+        document.getElementById('expenseDate').value = expense.date;
+        document.getElementById('expenseDevice').value = expense.deviceId || '';
+        document.getElementById('expensePlace').value = expense.place || '';
+        document.getElementById('expenseNotes').value = expense.notes || '';
+    } else {
+        document.getElementById('expenseType').value = 'expense';
+        document.getElementById('expenseDesc').value = '';
+        document.getElementById('expenseItem').value = '';
+        document.getElementById('expenseAmount').value = '';
+        document.getElementById('expenseDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('expenseDevice').value = '';
+        document.getElementById('expensePlace').value = '';
+        document.getElementById('expenseNotes').value = '';
+    }
+    
+    openModal('expenseModal');
+}
+
+function saveExpense(e) {
+    e.preventDefault();
+    const id = document.getElementById('editExpenseId').value;
+    
+    const expenseData = {
+        type: document.getElementById('expenseType').value,
+        description: document.getElementById('expenseDesc').value,
+        item: document.getElementById('expenseItem').value,
+        amount: parseFloat(document.getElementById('expenseAmount').value),
+        date: document.getElementById('expenseDate').value,
+        deviceId: document.getElementById('expenseDevice').value,
+        place: document.getElementById('expensePlace').value,
+        notes: document.getElementById('expenseNotes').value
+    };
+    
+    if (id) {
+        Object.assign(data.expenses.find(ex => ex.id === id), expenseData);
+    } else {
+        data.expenses.push({ id: Date.now().toString(), ...expenseData });
+    }
+    
+    saveData();
+    updateExpensesTable();
+    closeModal('expenseModal');
+    return false;
+}
+
+function deleteExpense() {
+    const id = document.getElementById('editExpenseId').value;
+    if (!confirm('למחוק רשומה זו?')) return;
+    data.expenses = data.expenses.filter(e => e.id !== id);
+    saveData();
+    updateExpensesTable();
+    closeModal('expenseModal');
+}
+
+let expenseFilter = 'all';
+function filterExpenses(type) {
+    if (type) expenseFilter = type;
+    document.querySelectorAll('#expenses .tab').forEach(t => t.classList.remove('active'));
+    event?.target?.classList?.add('active');
+    updateExpensesTable();
+}
+
+function updateExpensesTable() {
+    let filtered = data.expenses || [];
+    
+    if (expenseFilter === 'expense') filtered = filtered.filter(e => e.type === 'expense');
+    if (expenseFilter === 'income') filtered = filtered.filter(e => e.type === 'income');
+    
+    const dateFilter = document.getElementById('expenseFilterDate')?.value;
+    const itemFilter = document.getElementById('expenseFilterItem')?.value?.toLowerCase();
+    
+    if (dateFilter) filtered = filtered.filter(e => e.date === dateFilter);
+    if (itemFilter) filtered = filtered.filter(e => e.item?.toLowerCase().includes(itemFilter) || e.description?.toLowerCase().includes(itemFilter));
+    
+    // מיון לפי תאריך
+    filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    const tbody = document.getElementById('expensesTable');
+    tbody.innerHTML = filtered.map(e => {
+        const device = data.devices.find(d => d.id === e.deviceId);
+        const isExpense = e.type === 'expense';
+        return `
+            <tr onclick="openExpenseModal('${e.id}')" style="cursor:pointer">
+                <td><span class="status-badge ${isExpense ? 'status-repair' : 'status-available'}">${isExpense ? 'הוצאה' : 'הכנסה'}</span></td>
+                <td>${e.description}</td>
+                <td>${e.item || '-'}</td>
+                <td style="color:${isExpense ? 'var(--danger)' : 'var(--success)'}">₪${e.amount}</td>
+                <td>${formatDate(e.date)}</td>
+                <td>${device?.number || '-'}</td>
+                <td>${e.place || '-'}</td>
+                <td><button class="btn btn-sm btn-outline" onclick="event.stopPropagation();openExpenseModal('${e.id}')">✏️</button></td>
+            </tr>
+        `;
+    }).join('') || '<tr><td colspan="8" class="empty-state">אין רשומות</td></tr>';
+    
+    // חישוב סה"כ
+    const total = filtered.reduce((sum, e) => {
+        return sum + (e.type === 'income' ? e.amount : -e.amount);
+    }, 0);
+    document.getElementById('expensesTotal').textContent = `₪${total}`;
+    document.getElementById('expensesTotal').style.color = total >= 0 ? 'var(--success)' : 'var(--danger)';
+}
+
+function exportExpensesToExcel() {
+    let csv = '\ufeff';
+    csv += 'סוג,תיאור,פריט,סכום,תאריך,מכשיר,מקום רכישה,הערות\n';
+    data.expenses.forEach(e => {
+        const device = data.devices.find(d => d.id === e.deviceId);
+        csv += `${e.type === 'expense' ? 'הוצאה' : 'הכנסה'},${e.description},${e.item || ''},${e.amount},${e.date},${device?.number || ''},${e.place || ''},${e.notes || ''}\n`;
+    });
+    
+    const blob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `הוצאות-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+}
+
+// הוראות
+function loadInstructions() {
+    document.getElementById('instructionsText').value = data.instructions?.text || '';
+    document.getElementById('instructionsImage').value = data.instructions?.image || '';
+    updateInstructionsPreview();
+}
+
+function saveInstructions() {
+    data.instructions = {
+        text: document.getElementById('instructionsText').value,
+        image: document.getElementById('instructionsImage').value
+    };
+    saveData();
+    updateInstructionsPreview();
+    alert('✅ ההוראות נשמרו!');
+}
+
+function updateInstructionsPreview() {
+    const text = data.instructions?.text || '';
+    const image = data.instructions?.image || '';
+    let html = '';
+    if (text) html += `<div style="white-space:pre-wrap;padding:15px;background:var(--gray-50);border-radius:8px;margin-bottom:15px">${text}</div>`;
+    if (image) html += `<img src="${image}" style="max-width:100%;border-radius:8px">`;
+    document.getElementById('instructionsPreview').innerHTML = html || '<p style="color:var(--gray-400)">אין הוראות עדיין</p>';
+}
+
+// הגדרות רקע
+function setBackground(color) {
+    if (color === 'default') {
+        document.body.style.background = 'var(--gray-100)';
+        data.settings.bgColor = 'default';
+    } else {
+        document.body.style.background = color;
+        data.settings.bgColor = color;
+    }
+    document.body.style.backgroundImage = '';
+    data.settings.bgImage = '';
+}
+
+function applyBgImage() {
+    const url = document.getElementById('bgImage').value;
+    if (url) {
+        document.body.style.backgroundImage = `url(${url})`;
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundAttachment = 'fixed';
+        data.settings.bgImage = url;
+    }
+}
+
+// איפוס נתונים
+function resetAllData() {
+    if (!confirm('⚠️ האם אתה בטוח שברצונך למחוק את כל הנתונים?\n\nפעולה זו בלתי הפיכה!')) return;
+    if (!confirm('🚨 אישור נוסף: כל המכשירים, הלקוחות, ההשכרות וההגדרות יימחקו לצמיתות!')) return;
+    
+    localStorage.removeItem('gmachWaze');
+    data = {
+        devices: [],
+        customers: [],
+        rentals: [],
+        waitlist: [],
+        expenses: [],
+        instructions: { text: '', image: '' },
+        settings: {
+            defaultPrice: 10,
+            lateFee: 5,
+            skipShabbat: true,
+            skipHolidays: true,
+            password: '',
+            gmachName: 'גמ"ח וויז',
+            gmachSubtitle: 'משפ\' צדקה',
+            gmachLogo: 'לוגו.jpg',
+            bgColor: 'default'
+        }
+    };
+    saveData();
+    location.reload();
+}
+
+// פעולות לקוח
+function openCustomerActions(customerId) {
+    const customer = data.customers.find(c => c.id === customerId);
+    if (!customer) return;
+    
+    // חישוב סטטיסטיקות
+    const custRentals = data.rentals.filter(r => r.customerId === customerId);
+    const totalPaid = custRentals.filter(r => r.paid).reduce((sum, r) => sum + (r.amount || 0), 0);
+    const lateCount = custRentals.filter(r => r.returnDate && new Date(r.returnDate) > new Date(r.expectedReturn)).length;
+    
+    document.getElementById('customerActionsTitle').textContent = customer.name;
+    document.getElementById('customerActionsContent').innerHTML = `
+        <div style="background:var(--gray-50);padding:15px;border-radius:8px;margin-bottom:15px">
+            <p><strong>טלפון:</strong> ${customer.phone}</p>
+            <p><strong>השכרות:</strong> ${custRentals.length}</p>
+            <p><strong>שילם סה"כ:</strong> ₪${totalPaid}</p>
+            <p><strong>חוב נוכחי:</strong> ${customer.debt > 0 ? '<span style="color:var(--danger)">₪' + customer.debt + '</span>' : '₪0'}</p>
+            <p><strong>איחורים:</strong> ${lateCount}</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+            <button class="btn btn-primary" onclick="startRentalForCustomer('${customerId}')">➕ התחל השכרה</button>
+            <a href="tel:${customer.phone}" class="btn btn-outline">📞 התקשר</a>
+            ${customer.debt > 0 ? `<button class="btn btn-success" onclick="clearCustomerDebt('${customerId}')">💰 מחק חוב</button>` : ''}
+            <button class="btn btn-outline" onclick="openEditCustomer('${customerId}')">✏️ ערוך פרטים</button>
+        </div>
+    `;
+    openModal('customerActionsModal');
+}
+
+function startRentalForCustomer(customerId) {
+    const customer = data.customers.find(c => c.id === customerId);
+    closeModal('customerActionsModal');
+    showPage('newRental');
+    setTimeout(() => {
+        document.getElementById('customerName').value = customer.name;
+        document.getElementById('customerPhone').value = customer.phone;
+    }, 100);
+}
+
+function clearCustomerDebt(customerId) {
+    if (!confirm('האם למחוק את כל החוב של לקוח זה?')) return;
+    const customer = data.customers.find(c => c.id === customerId);
+    customer.debt = 0;
+    saveData();
+    updateAll();
+    closeModal('customerActionsModal');
+    alert('✅ החוב נמחק!');
+}
+
+function openEditCustomer(customerId) {
+    closeModal('customerActionsModal');
+    openCustomerModal(customerId);
+}
+
+// שמירת מכשיר לתאריך מסוים
+function openReserveModal() {
+    // עדכון רשימת מכשירים
+    document.getElementById('reserveDevice').innerHTML = 
+        data.devices.map(d => `<option value="${d.id}">${d.number} - ${d.model || 'רגיל'}</option>`).join('');
+    document.getElementById('reserveDate').value = new Date().toISOString().split('T')[0];
+    openModal('reserveModal');
+}
+
+function saveReservation(e) {
+    e.preventDefault();
+    
+    const reservation = {
+        id: Date.now().toString(),
+        name: document.getElementById('reserveName').value,
+        phone: document.getElementById('reservePhone').value,
+        deviceId: document.getElementById('reserveDevice').value,
+        date: document.getElementById('reserveDate').value,
+        notes: document.getElementById('reserveNotes').value,
+        type: 'reservation'
+    };
+    
+    data.waitlist.push(reservation);
+    saveData();
+    updateWaitlistTable();
+    closeModal('reserveModal');
+    alert('✅ השמירה נוספה!');
+    return false;
 }
 
 // מודלים
